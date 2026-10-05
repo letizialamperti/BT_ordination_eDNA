@@ -26,4 +26,4 @@ python training_BarlowTwins_kfold.py \
     --max_epochs "$BT_MAX_EPOCHS" \
     --output_root "${BT_OUTPUT_ROOT:-runs_bt_kfold}" \
     --seed "${BT_SEED:-0}" \
-    --sequence_length 300 --sample_subset_size 1000 --batch_size 8 --num_workers 12
+    --sequence_length 300 --sample_subset_size 500 --batch_size 8 --num_workers 12
