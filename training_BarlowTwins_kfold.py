@@ -1,4 +1,4 @@
-"""Outer spatial CV with one prespecified inner spatial holdout per outer fold."""
+"""Fixed-duration Barlow Twins training on each outer fold training set only."""
 import argparse
 import csv
 import hashlib
@@ -31,12 +31,9 @@ def load_folds(split_dir):
     return paths, folds
 
 
-def make_roles(folds, outer_fold, inner_fold):
-    if outer_fold == inner_fold:
-        raise ValueError('Inner and outer folds must differ.')
-    outer, inner = folds[outer_fold - 1], folds[inner_fold - 1]
-    return {code: ('outer_eval' if outer[code] == 'validation' else
-                   'inner_valid' if inner[code] == 'validation' else 'inner_train')
+def make_roles(folds, outer_fold):
+    outer = folds[outer_fold - 1]
+    return {code: ('outer_eval' if outer[code] == 'validation' else 'train')
             for code in sorted(outer)}
 
 
@@ -69,52 +66,47 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--split_dir', type=Path, default=Path(__file__).parent / 'k_cross')
     parser.add_argument('--outer_fold', type=int, choices=range(1, 5), required=True)
-    parser.add_argument('--inner_fold', type=int, choices=range(1, 5))
-    parser.add_argument('--output_root', type=Path, default=Path('runs_bt_kfold'))
+    parser.add_argument('--output_root', type=Path, default=Path('runs_bt_fixed'))
     parser.add_argument('--dry_run', action='store_true', help='Check splits without importing PyTorch or writing files.')
     parser.add_argument('--samples_dir', type=Path)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--sequence_length', type=int, default=300)
     parser.add_argument('--sample_subset_size', type=int, default=500)
-    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--num_workers', type=int, default=12)
     parser.add_argument('--token_emb_dim', type=int, default=8)
-    parser.add_argument('--sample_repr_dim', type=int)
-    parser.add_argument('--sample_emb_dim', type=int)
-    parser.add_argument('--barlow_twins_lambda', type=float)
-    parser.add_argument('--initial_learning_rate', type=float)
-    parser.add_argument('--max_epochs', type=int)
+    parser.add_argument('--sample_repr_dim', type=int, default=256)
+    parser.add_argument('--sample_emb_dim', type=int, default=64)
+    parser.add_argument('--barlow_twins_lambda', type=float, default=0.005)
+    parser.add_argument('--initial_learning_rate', type=float, default=0.001)
+    parser.add_argument('--max_epochs', type=int, default=1)
     parser.add_argument('--accelerator', choices=['auto', 'cpu', 'gpu'], default='auto')
+    parser.add_argument('--weight_decay', type=float, default=0.0001)
     args = parser.parse_args()
-    args.inner_fold = args.inner_fold or args.outer_fold % 4 + 1
     paths, folds = load_folds(args.split_dir)
-    roles = make_roles(folds, args.outer_fold, args.inner_fold)
-    print(f'Outer fold {args.outer_fold}; inner fold {args.inner_fold}: {dict(Counter(roles.values()))}')
+    roles = make_roles(folds, args.outer_fold)
+    print(f'Outer fold {args.outer_fold}: {dict(Counter(roles.values()))}')
     if args.dry_run:
         return
-    required = ['samples_dir', 'sample_repr_dim', 'sample_emb_dim', 'barlow_twins_lambda',
-                'initial_learning_rate', 'max_epochs']
-    for key in required:
-        if getattr(args, key) is None:
-            parser.error(f'--{key} must be explicitly supplied for training.')
+    if args.samples_dir is None:
+        parser.error('--samples_dir is required for training.')
     for key in ['sequence_length', 'sample_subset_size', 'batch_size', 'token_emb_dim',
                 'sample_repr_dim', 'sample_emb_dim', 'initial_learning_rate', 'max_epochs']:
         if getattr(args, key) <= 0:
             parser.error(f'--{key} must be positive.')
-    if args.sample_repr_dim % 4 or args.batch_size < 2 or args.num_workers < 0 or args.barlow_twins_lambda < 0:
-        parser.error('repr_dim must be divisible by 4; batch_size >= 2; workers and lambda >= 0.')
+    if args.sample_repr_dim % 4 or args.batch_size < 2 or args.num_workers < 0 or args.barlow_twins_lambda < 0 or args.weight_decay < 0:
+        parser.error('repr_dim must be divisible by 4; batch_size >= 2; workers, lambda and weight_decay >= 0.')
 
     import torch
     import pytorch_lightning as pl
-    from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
-    from pytorch_lightning.callbacks import ModelCheckpoint
+    from torch.utils.data import DataLoader, RandomSampler
     from pytorch_lightning.loggers import CSVLogger
     from ORDNA.data.barlow_twins_dataset import BarlowTwinsDataset
     from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 
     pl.seed_everything(args.seed, workers=True)
     datasets = {}
-    for role in ['inner_train', 'inner_valid']:
+    for role in ['train']:
         files = [args.samples_dir / f'{c}.csv' for c, r in roles.items() if r == role]
         missing = [str(p) for p in files if not p.is_file()]
         if missing:
@@ -126,7 +118,7 @@ def main():
         datasets[role] = dataset
     loaders = {}
     for role, dataset in datasets.items():
-        sampler = RandomSampler(dataset) if role == 'inner_train' else SequentialSampler(dataset)
+        sampler = RandomSampler(dataset)
         loaders[role] = DataLoader(dataset, batch_sampler=MergeSingletonBatchSampler(sampler, args.batch_size),
                                    num_workers=args.num_workers, pin_memory=torch.cuda.is_available())
 
@@ -145,15 +137,17 @@ def main():
     model = SelfAttentionBarlowTwinsEmbedder(
         token_emb_dim=args.token_emb_dim, seq_len=args.sequence_length,
         sample_repr_dim=args.sample_repr_dim, sample_emb_dim=args.sample_emb_dim,
-        lmbda=args.barlow_twins_lambda, initial_learning_rate=args.initial_learning_rate)
-    checkpoint = ModelCheckpoint(monitor='val_barlow_loss', mode='min', save_top_k=1,
-                                 save_last=True, dirpath=run_dir / 'checkpoints', filename='best-{epoch:03d}')
+        lmbda=args.barlow_twins_lambda, initial_learning_rate=args.initial_learning_rate,
+        weight_decay=args.weight_decay)
     trainer = pl.Trainer(accelerator=args.accelerator, devices=1, max_epochs=args.max_epochs,
-                         logger=CSVLogger(str(run_dir), name='metrics'), callbacks=[checkpoint],
+                         logger=CSVLogger(str(run_dir), name='metrics'), enable_checkpointing=False,
+                         limit_val_batches=0, num_sanity_val_steps=0,
                          log_every_n_steps=10, default_root_dir=str(run_dir))
-    trainer.fit(model, train_dataloaders=loaders['inner_train'], val_dataloaders=loaders['inner_valid'])
-    (run_dir / 'best_checkpoint.txt').write_text(checkpoint.best_model_path + '\n')
-    print(f'Best checkpoint (inner validation only): {checkpoint.best_model_path}')
+    trainer.fit(model, train_dataloaders=loaders['train'])
+    checkpoint_path = run_dir / 'final.ckpt'
+    trainer.save_checkpoint(str(checkpoint_path))
+    print(f'Final checkpoint (no validation selection): {checkpoint_path}')
+
 
 
 if __name__ == '__main__':
