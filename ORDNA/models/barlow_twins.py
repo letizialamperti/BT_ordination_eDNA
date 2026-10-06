@@ -13,7 +13,8 @@ class SelfAttentionBarlowTwinsEmbedder(pl.LightningModule):
         sample_repr_dim: int,
         sample_emb_dim: int,
         lmbda: float = 0.005,
-        initial_learning_rate: float = 1e-5
+        initial_learning_rate: float = 1e-5,
+        weight_decay: float = 0.01
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -36,6 +37,7 @@ class SelfAttentionBarlowTwinsEmbedder(pl.LightningModule):
         )
         self.lmbda = lmbda
         self.initial_learning_rate = initial_learning_rate
+        self.weight_decay = weight_decay
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: (B, sequence_length, ...)
@@ -55,8 +57,8 @@ class SelfAttentionBarlowTwinsEmbedder(pl.LightningModule):
         z2 = self(x2)
 
         # normalize
-        z1 = (z1 - z1.mean(0)) / z1.std(0)
-        z2 = (z2 - z2.mean(0)) / z2.std(0)
+        z1 = (z1 - z1.mean(0)) / z1.std(0).clamp_min(1e-6)
+        z2 = (z2 - z2.mean(0)) / z2.std(0).clamp_min(1e-6)
 
         # cross-correlation
         c = (z1.T @ z2) / B
@@ -80,18 +82,18 @@ class SelfAttentionBarlowTwinsEmbedder(pl.LightningModule):
         z1 = self(x1)
         z2 = self(x2)
 
-        z1 = (z1 - z1.mean(0)) / z1.std(0)
-        z2 = (z2 - z2.mean(0)) / z2.std(0)
+        z1 = (z1 - z1.mean(0)) / z1.std(0).clamp_min(1e-6)
+        z2 = (z2 - z2.mean(0)) / z2.std(0).clamp_min(1e-6)
 
         c = (z1.T @ z2) / B
         diag_loss     = ((torch.diag(c) - 1) ** 2).sum()
         off_diag_loss = ((c - torch.diag(torch.diag(c))) ** 2).sum() * self.lmbda
         loss = diag_loss + off_diag_loss
 
-        self.log('val_barlow_loss',     loss,     prog_bar=True)
+        self.log('val_barlow_loss', loss, prog_bar=True, on_step=False, on_epoch=True, batch_size=B)
         self.log('val_diag_loss',       diag_loss)
         self.log('val_off_diag_loss',   off_diag_loss)
         return loss
 
     def configure_optimizers(self):
-        return AdamW(self.parameters(), lr=self.initial_learning_rate)
+        return AdamW(self.parameters(), lr=self.initial_learning_rate, weight_decay=self.weight_decay)
