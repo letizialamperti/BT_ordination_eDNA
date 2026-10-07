@@ -1,6 +1,7 @@
 """Fixed-duration Barlow Twins training on each outer fold training set only."""
 import argparse
 import csv
+import pandas as pd
 import hashlib
 import json
 from collections import Counter
@@ -106,24 +107,119 @@ def main():
 
     pl.seed_everything(args.seed, workers=True)
     datasets = {}
+    excluded_records = []
+
     for role in ['train']:
-        files = [args.samples_dir / f'{c}.csv' for c, r in roles.items() if r == role]
-        missing = [str(p) for p in files if not p.is_file()]
+        files = [
+            args.samples_dir / f'{code}.csv'
+            for code, sample_role in roles.items()
+            if sample_role == role
+        ]
+
+        # Missing files remain a hard error: this is different from a QC exclusion.
+        missing = [str(path) for path in files if not path.is_file()]
         if missing:
             raise FileNotFoundError(f'Missing {role} files: {missing}')
-        dataset = BarlowTwinsDataset(files, args.sample_subset_size, args.sequence_length)
-        excluded = set(files) - set(dataset.files)
-        if excluded:
-            raise ValueError(f'Samples excluded by Dataset (columns/read count): {sorted(map(str, excluded))}')
+
+        dataset = BarlowTwinsDataset(
+            files,
+            args.sample_subset_size,
+            args.sequence_length,
+        )
+
+        accepted = set(dataset.files)
+        excluded = sorted(set(files) - accepted)
+
+        minimum_required = 2 * args.sample_subset_size
+
+        for path in excluded:
+            # Read only what is required for QC.
+            try:
+                df = pd.read_csv(path, usecols=['Forward', 'Reverse'])
+            except ValueError:
+                # Most likely Forward and/or Reverse is absent.
+                excluded_records.append({
+                    'spygen_code': path.stem,
+                    'total_rows': '',
+                    'valid_paired_reads': '',
+                    'minimum_required': minimum_required,
+                    'reason': 'missing_required_columns',
+                    'role': role,
+                })
+
+                print(
+                    f'WARNING: excluding {path.stem} from {role}: '
+                    f'missing Forward/Reverse columns.',
+                    flush=True,
+                )
+                continue
+
+            total_rows = len(df)
+
+            valid_mask = (
+                df['Forward'].notna()
+                & df['Reverse'].notna()
+                & df['Forward'].astype(str).str.strip().ne('')
+                & df['Reverse'].astype(str).str.strip().ne('')
+            )
+            valid_paired_reads = int(valid_mask.sum())
+
+            if total_rows < minimum_required:
+                reason = 'insufficient_rows'
+            elif valid_paired_reads < minimum_required:
+                reason = 'insufficient_valid_paired_reads'
+            else:
+                reason = 'excluded_by_dataset_other'
+
+            excluded_records.append({
+                'spygen_code': path.stem,
+                'total_rows': total_rows,
+                'valid_paired_reads': valid_paired_reads,
+                'minimum_required': minimum_required,
+                'reason': reason,
+                'role': role,
+            })
+
+            print(
+                f'WARNING: excluding {path.stem} from {role}: '
+                f'{total_rows} total rows, '
+                f'{valid_paired_reads} valid paired reads, '
+                f'minimum required {minimum_required}; '
+                f'reason={reason}.',
+                flush=True,
+            )
+
+        if len(dataset) == 0:
+            raise ValueError(
+                f'No usable samples remain in {role} after Dataset filtering.'
+            )
+
         datasets[role] = dataset
-    loaders = {}
-    for role, dataset in datasets.items():
-        sampler = RandomSampler(dataset)
-        loaders[role] = DataLoader(dataset, batch_sampler=MergeSingletonBatchSampler(sampler, args.batch_size),
-                                   num_workers=args.num_workers, pin_memory=torch.cuda.is_available())
 
     run_dir = args.output_root / f'fold_{args.outer_fold:02d}' / f'seed_{args.seed}'
     run_dir.mkdir(parents=True, exist_ok=False)
+    excluded_path = run_dir / 'excluded_samples.csv'
+
+    with excluded_path.open('w', newline='') as stream:
+        fieldnames = [
+            'spygen_code',
+            'total_rows',
+            'valid_paired_reads',
+            'minimum_required',
+            'reason',
+            'role',
+        ]
+
+        writer = csv.DictWriter(stream, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(excluded_records)
+
+    print(
+        f'QC exclusions: {len(excluded_records)} sample(s); '
+        f'report written to {excluded_path}',
+        flush=True,
+    )
+
     config = {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()}
     config['split_sha256'] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
     config['sample_counts'] = dict(Counter(roles.values()))
