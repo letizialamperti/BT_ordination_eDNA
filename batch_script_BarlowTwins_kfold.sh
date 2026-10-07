@@ -19,7 +19,7 @@ python training_BarlowTwins_kfold.py \
     --output_root runs_bt_fixed \
     --sequence_length 300 \
     --sample_subset_size 500 \
-    --batch_size 64 \
+    --batch_size 32 \
     --token_emb_dim 8 \
     --sample_repr_dim 256 \
     --sample_emb_dim 64 \
