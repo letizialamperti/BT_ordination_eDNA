@@ -96,15 +96,14 @@ def main():
         for code in codes:
             src = args.samples_dir / f'{code}.csv'
             print(f'Reading bounded input: {src.name}', flush=True)
-            data = pd.read_csv(src, nrows=128000, usecols=['Forward', 'Reverse'])
+            data = pd.read_csv(src, nrows=128000, usecols=['Forward', 'Reverse'], dtype=str, keep_default_na=False)
             if len(data) < 1000:
                 print(f'Warning: {code} has fewer than 1000 paired reads ({len(data)}).', flush=True)
-            if data.isna().any().any() or data.apply(lambda col: col.astype(str).str.strip().eq('')).any().any():
-                raise ValueError(f'{code}: missing or empty sequence in diagnostic input.')
             dest = Path(temp) / src.name
             data.to_csv(dest, index=False)
             files.append(dest)
         dataset = BarlowTwinsDataset(files, sample_subset_size=500, sequence_length=300)
+        (run / 'read_qc.json').write_text(json.dumps(dataset.qc_records, indent=2))
         loader = DataLoader(dataset, batch_sampler=MergeSingletonBatchSampler(RandomSampler(dataset), 32),
                             num_workers=args.num_workers, pin_memory=True)
         if len(dataset) < 32:

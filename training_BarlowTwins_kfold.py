@@ -130,64 +130,8 @@ def main():
         accepted = set(dataset.files)
         excluded = sorted(set(files) - accepted)
 
-        minimum_required = 2 * args.sample_subset_size
-
-        for path in excluded:
-            # Read only what is required for QC.
-            try:
-                df = pd.read_csv(path, usecols=['Forward', 'Reverse'])
-            except ValueError:
-                # Most likely Forward and/or Reverse is absent.
-                excluded_records.append({
-                    'spygen_code': path.stem,
-                    'total_rows': '',
-                    'valid_paired_reads': '',
-                    'minimum_required': minimum_required,
-                    'reason': 'missing_required_columns',
-                    'role': role,
-                })
-
-                print(
-                    f'WARNING: excluding {path.stem} from {role}: '
-                    f'missing Forward/Reverse columns.',
-                    flush=True,
-                )
-                continue
-
-            total_rows = len(df)
-
-            valid_mask = (
-                df['Forward'].notna()
-                & df['Reverse'].notna()
-                & df['Forward'].astype(str).str.strip().ne('')
-                & df['Reverse'].astype(str).str.strip().ne('')
-            )
-            valid_paired_reads = int(valid_mask.sum())
-
-            if total_rows < minimum_required:
-                reason = 'insufficient_rows'
-            elif valid_paired_reads < minimum_required:
-                reason = 'insufficient_valid_paired_reads'
-            else:
-                reason = 'excluded_by_dataset_other'
-
-            excluded_records.append({
-                'spygen_code': path.stem,
-                'total_rows': total_rows,
-                'valid_paired_reads': valid_paired_reads,
-                'minimum_required': minimum_required,
-                'reason': reason,
-                'role': role,
-            })
-
-            print(
-                f'WARNING: excluding {path.stem} from {role}: '
-                f'{total_rows} total rows, '
-                f'{valid_paired_reads} valid paired reads, '
-                f'minimum required {minimum_required}; '
-                f'reason={reason}.',
-                flush=True,
-            )
+        excluded_records.extend(dict(record, role=role)
+                                for record in dataset.qc_records if record['reason'])
 
         if len(dataset) == 0:
             raise ValueError(
@@ -220,6 +164,9 @@ def main():
             'minimum_required',
             'reason',
             'role',
+            'discarded_missing_pairs',
+            'usable_chunks',
+            'unused_valid_pairs',
         ]
 
         writer = csv.DictWriter(stream, fieldnames=fieldnames)
@@ -231,6 +178,12 @@ def main():
         f'report written to {excluded_path}',
         flush=True,
     )
+
+    with (run_dir / 'read_qc.csv').open('w', newline='') as stream:
+        records = datasets['train'].qc_records
+        writer = csv.DictWriter(stream, fieldnames=list(records[0]))
+        writer.writeheader()
+        writer.writerows(records)
 
     config = {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()}
     config['split_sha256'] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
