@@ -2,8 +2,8 @@
 #OAR -n barlow-twins-kfold
 #OAR -l /nodes=1/gpu=1,walltime=24:00:00
 #OAR -p gpumodel='A100'
-#OAR --stdout barlow-twins-kfold-%j.out
-#OAR --stderr barlow-twins-kfold-%j.err
+#OAR --stdout barlow-twins-bs32-%jobid%.out
+#OAR --stderr barlow-twins-bs32-%jobid%.err
 #OAR --project pr-qiepb
 set -e
 # Defaults to fold 1; pass 2, 3 or 4 to run another fold.
