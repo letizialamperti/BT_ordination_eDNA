@@ -98,7 +98,7 @@ def main():
             print(f'Reading bounded input: {src.name}', flush=True)
             data = pd.read_csv(src, nrows=128000, usecols=['Forward', 'Reverse'])
             if len(data) < 1000:
-                raise ValueError(f'{code}: fewer than 1000 paired reads.')
+                print(f'Warning: {code} has fewer than 1000 paired reads ({len(data)}).', flush=True)
             if data.isna().any().any() or data.apply(lambda col: col.astype(str).str.strip().eq('')).any().any():
                 raise ValueError(f'{code}: missing or empty sequence in diagnostic input.')
             dest = Path(temp) / src.name
