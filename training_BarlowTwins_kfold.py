@@ -101,7 +101,7 @@ def main():
     import torch
     import pytorch_lightning as pl
     from torch.utils.data import DataLoader, RandomSampler
-    from pytorch_lightning.loggers import CSVLogger
+    from pytorch_lightning.loggers import CSVLogger, WandbLogger
     from ORDNA.data.barlow_twins_dataset import BarlowTwinsDataset
     from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 
@@ -252,10 +252,32 @@ def main():
         sample_repr_dim=args.sample_repr_dim, sample_emb_dim=args.sample_emb_dim,
         lmbda=args.barlow_twins_lambda, initial_learning_rate=args.initial_learning_rate,
         weight_decay=args.weight_decay)
-    trainer = pl.Trainer(accelerator=args.accelerator, devices=1, max_epochs=args.max_epochs,
-                         logger=CSVLogger(str(run_dir), name='metrics'), enable_checkpointing=False,
-                         limit_val_batches=0, num_sanity_val_steps=0,
-                         log_every_n_steps=10, default_root_dir=str(run_dir))
+    csv_logger = CSVLogger(str(run_dir), name='metrics')
+
+    wandb_logger = WandbLogger(
+        project='BT_ordination_eDNA',
+        name=(
+            f'fold{args.outer_fold}_'
+            f'bs{args.batch_size}_'
+            f'lr{args.initial_learning_rate}_'
+            f'seed{args.seed}'
+        ),
+        save_dir=str(run_dir),
+    )
+    
+    trainer = pl.Trainer(
+        accelerator=args.accelerator,
+        devices=1,
+        max_epochs=args.max_epochs,
+        logger=[csv_logger, wandb_logger],
+        enable_checkpointing=False,
+        limit_val_batches=0,
+        num_sanity_val_steps=0,
+        log_every_n_steps=10,
+        default_root_dir=str(run_dir),
+        gradient_clip_val=1.0,
+        gradient_clip_algorithm='norm',
+    )
     trainer.fit(model, train_dataloaders=loaders['train'])
     checkpoint_path = run_dir / 'final.ckpt'
     trainer.save_checkpoint(str(checkpoint_path))
