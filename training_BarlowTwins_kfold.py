@@ -223,6 +223,11 @@ def main():
     config = {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()}
     config['split_sha256'] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
     config['sample_counts'] = dict(Counter(roles.values()))
+    config['excluded_samples'] = excluded_records
+    config['n_excluded_samples'] = len(excluded_records)
+    config['n_training_chunks'] = len(datasets['train'])
+    config['n_training_sample_files'] = len(datasets['train'].files)
+
     (run_dir / 'config.json').write_text(json.dumps(config, indent=2))
     with (run_dir / 'sample_roles.csv').open('w', newline='') as stream:
         writer = csv.writer(stream)
