@@ -195,6 +195,18 @@ def main():
             )
 
         datasets[role] = dataset
+    loaders = {}
+    for role, dataset in datasets.items():
+        sampler = RandomSampler(dataset)
+        loaders[role] = DataLoader(
+            dataset,
+            batch_sampler=MergeSingletonBatchSampler(
+                sampler,
+                args.batch_size
+            ),
+            num_workers=args.num_workers,
+            pin_memory=torch.cuda.is_available()
+        )
 
     run_dir = args.output_root / f'fold_{args.outer_fold:02d}' / f'seed_{args.seed}'
     run_dir.mkdir(parents=True, exist_ok=False)
