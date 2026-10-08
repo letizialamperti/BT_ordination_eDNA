@@ -1,6 +1,6 @@
 #!/bin/bash
 #OAR -n bt-count-groups
-#OAR -l /nodes=1/core=1,walltime=02:00:00
+#OAR -l /nodes=1/core=1,walltime=01:00:00
 #OAR --stdout bt-count-groups-%jobid%.out
 #OAR --stderr bt-count-groups-%jobid%.err
 #OAR --project pr-qiepb
