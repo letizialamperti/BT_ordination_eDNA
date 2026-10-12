@@ -252,6 +252,7 @@ def main():
             f'fold{args.outer_fold}_'
             f'bs{args.batch_size}_'
             f'lr{args.initial_learning_rate}_'
+            f'cap{args.max_chunks_per_sample}_'
             f'seed{args.seed}'
         ),
         save_dir=str(run_dir),
