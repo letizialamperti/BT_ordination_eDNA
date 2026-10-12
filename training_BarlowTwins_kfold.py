@@ -160,7 +160,12 @@ def main():
             pin_memory=torch.cuda.is_available()
         )
 
-    run_dir = args.output_root / f'fold_{args.outer_fold:02d}' / f'seed_{args.seed}'
+    run_dir = (
+        args.output_root
+        / f'cap_{args.max_chunks_per_sample}'
+        / f'fold_{args.outer_fold:02d}'
+        / f'seed_{args.seed}'
+    )
     run_dir.mkdir(parents=True, exist_ok=False)
     excluded_path = run_dir / 'excluded_samples.csv'
 
