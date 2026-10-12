@@ -83,6 +83,12 @@ def main():
     parser.add_argument('--max_epochs', type=int, default=1)
     parser.add_argument('--accelerator', choices=['auto', 'cpu', 'gpu'], default='auto')
     parser.add_argument('--weight_decay', type=float, default=0.0001)
+    parser.add_argument(
+    '--max_chunks_per_sample',
+    type=int,
+    default=0,
+    help='Maximum number of chunks per biological sample; 0 means no cap.',
+    )
     args = parser.parse_args()
     paths, folds = load_folds(args.split_dir)
     roles = make_roles(folds, args.outer_fold)
@@ -125,6 +131,8 @@ def main():
             files,
             args.sample_subset_size,
             args.sequence_length,
+            max_chunks_per_sample=args.max_chunks_per_sample,
+            seed=args.seed,
         )
 
         accepted = set(dataset.files)
@@ -172,6 +180,33 @@ def main():
         writer = csv.DictWriter(stream, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(excluded_records)
+        chunk_sampling_records = []
+
+        for role, dataset in datasets.items():
+            chunk_sampling_records.extend(
+                dict(record, role=role)
+                for record in dataset.qc_records
+            )
+        with (run_dir / 'chunk_sampling.csv').open('w', newline='') as stream:
+            fieldnames = [
+                'spygen_code',
+                'role',
+                'valid_paired_reads',
+                'usable_chunks',
+                'available_chunks',
+                'used_chunks',
+                'fraction_chunks_used',
+                'unused_valid_pairs',
+                'reason',
+            ]
+        
+            writer = csv.DictWriter(
+                stream,
+                fieldnames=fieldnames,
+                extrasaction='ignore',
+            )
+            writer.writeheader()
+            writer.writerows(chunk_sampling_records)
 
     print(
         f'QC exclusions: {len(excluded_records)} sample(s); '
