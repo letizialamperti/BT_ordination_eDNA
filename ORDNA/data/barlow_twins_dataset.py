@@ -153,9 +153,13 @@ class BarlowTwinsDataset(Dataset):
             if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
                 raise RuntimeError(f'Input changed during indexing: {path}')
             self.qc_records.append(qc)
-            print(f'{path.name}: {qc["valid_paired_reads"]} valid pairs, '
-                  f'{qc["discarded_missing_pairs"]} missing pairs discarded, '
-                  f'{qc["usable_chunks"]} chunks', flush=True)
+            print(
+                f'{path.name}: {qc["valid_paired_reads"]} valid pairs, '
+                f'{qc["discarded_missing_pairs"]} missing pairs discarded, '
+                f'{qc["available_chunks"]} chunks available, '
+                f'{qc["used_chunks"]} used',
+                flush=True,
+            )
             if not ranges:
                 continue
             self.files.append(path)
