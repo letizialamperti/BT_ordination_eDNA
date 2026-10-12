@@ -37,11 +37,22 @@ def valid_pair(row, forward_idx, reverse_idx):
 
 
 class BarlowTwinsDataset(Dataset):
-    def __init__(self, sample_files: List[Path], sample_subset_size: int,
-                 sequence_length: int) -> None:
+    def __init__(
+        self,
+        sample_files: List[Path],
+        sample_subset_size: int,
+        sequence_length: int,
+        max_chunks_per_sample: int = 0,
+        seed: int = 0,
+    ) -> None:
         super().__init__()
         if sample_subset_size <= 0 or sequence_length <= 0:
             raise ValueError('Subset size and sequence length must be positive.')
+        if max_chunks_per_sample < 0:
+            raise ValueError('max_chunks_per_sample must be >= 0.')
+        
+        self.max_chunks_per_sample = max_chunks_per_sample
+        rng = np.random.default_rng(seed)
         self.files = []
         self.accumulated_num_subsets = []
         self.sample_subset_size = sample_subset_size
@@ -57,9 +68,19 @@ class BarlowTwinsDataset(Dataset):
         for source in sample_files:
             path = Path(source)
             before = path.stat()
-            qc = dict(spygen_code=path.stem, total_rows=0, valid_paired_reads=0,
-                      discarded_missing_pairs=0, minimum_required=required,
-                      usable_chunks=0, unused_valid_pairs=0, reason='')
+            qc = dict(
+                spygen_code=path.stem,
+                total_rows=0,
+                valid_paired_reads=0,
+                discarded_missing_pairs=0,
+                minimum_required=required,
+                usable_chunks=0,
+                available_chunks=0,
+                used_chunks=0,
+                fraction_chunks_used=0.0,
+                unused_valid_pairs=0,
+                reason='',
+            )
             ranges = []
             with path.open('rb') as stream:
                 header_raw = stream.readline()
@@ -102,6 +123,32 @@ class BarlowTwinsDataset(Dataset):
                 qc['usable_chunks'] = len(ranges)
                 if not ranges:
                     qc['reason'] = 'insufficient_valid_paired_reads'
+                qc['available_chunks'] = len(ranges)
+
+                if (
+                    max_chunks_per_sample > 0
+                    and len(ranges) > max_chunks_per_sample
+                ):
+                    selected_indices = rng.choice(
+                        len(ranges),
+                        size=max_chunks_per_sample,
+                        replace=False,
+                    )
+                
+                    # Sorting is not required for training, but keeps indexing deterministic
+                    # and easier to inspect.
+                    selected_indices = np.sort(selected_indices)
+                
+                    ranges = [ranges[i] for i in selected_indices]
+                
+                qc['used_chunks'] = len(ranges)
+                
+                if qc['available_chunks'] > 0:
+                    qc['fraction_chunks_used'] = (
+                        qc['used_chunks'] / qc['available_chunks']
+                    )
+                else:
+                    qc['fraction_chunks_used'] = 0.0
             after = path.stat()
             if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
                 raise RuntimeError(f'Input changed during indexing: {path}')
