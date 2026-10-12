@@ -174,39 +174,43 @@ def main():
             'role',
             'discarded_missing_pairs',
             'usable_chunks',
+            'available_chunks',
+            'used_chunks',
+            'fraction_chunks_used',
             'unused_valid_pairs',
         ]
 
         writer = csv.DictWriter(stream, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(excluded_records)
-        chunk_sampling_records = []
+    
+    chunk_sampling_records = []
 
-        for role, dataset in datasets.items():
-            chunk_sampling_records.extend(
-                dict(record, role=role)
-                for record in dataset.qc_records
-            )
-        with (run_dir / 'chunk_sampling.csv').open('w', newline='') as stream:
-            fieldnames = [
-                'spygen_code',
-                'role',
-                'valid_paired_reads',
-                'usable_chunks',
-                'available_chunks',
-                'used_chunks',
-                'fraction_chunks_used',
-                'unused_valid_pairs',
-                'reason',
-            ]
+    for role, dataset in datasets.items():
+        chunk_sampling_records.extend(
+            dict(record, role=role)
+            for record in dataset.qc_records
+        )
+    with (run_dir / 'chunk_sampling.csv').open('w', newline='') as stream:
+        fieldnames = [
+            'spygen_code',
+            'role',
+            'valid_paired_reads',
+            'usable_chunks',
+            'available_chunks',
+            'used_chunks',
+            'fraction_chunks_used',
+            'unused_valid_pairs',
+            'reason',
+        ]
         
-            writer = csv.DictWriter(
-                stream,
-                fieldnames=fieldnames,
-                extrasaction='ignore',
-            )
-            writer.writeheader()
-            writer.writerows(chunk_sampling_records)
+        writer = csv.DictWriter(
+            stream,
+            fieldnames=fieldnames,
+            extrasaction='ignore',
+        )
+        writer.writeheader()
+        writer.writerows(chunk_sampling_records)
 
     print(
         f'QC exclusions: {len(excluded_records)} sample(s); '
