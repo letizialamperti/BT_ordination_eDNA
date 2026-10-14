@@ -13,4 +13,13 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 source /applis/environments/conda.sh
 conda activate zioboia
 
+echo "Job started at: $(date)"
+echo "Host: $(hostname)"
+echo "Working directory: $(pwd)"
+echo "Python executable: $(which python)"
+
+nvidia-smi
+
 python generate_embeddings_fold.py
+
+echo "Job finished at: $(date)"
