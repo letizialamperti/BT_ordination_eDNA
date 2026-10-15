@@ -1,7 +1,6 @@
 #!/bin/bash
 #OAR -n barlow-twins-kfold-bs64
 #OAR -l /nodes=1/gpu=1,walltime=04:00:00
-#OAR -p gpumodel='A100'
 #OAR --stdout barlow-twins-bs64-%jobid%.out
 #OAR --stderr barlow-twins-bs64-%jobid%.err
 #OAR --project pr-qiepb
