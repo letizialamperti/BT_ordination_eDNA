@@ -22,7 +22,7 @@ python training_BarlowTwins_kfold.py \
     --token_emb_dim 8 \
     --sample_repr_dim 256 \
     --sample_emb_dim 64 \
-    --max_chunks_per_sample 1000 \
+    --max_chunks_per_sample 0\
     --barlow_twins_lambda 0.005 \
     --initial_learning_rate 0.0003 \
     --weight_decay 0.0001 \
