@@ -6,7 +6,7 @@
 #OAR --project pr-qiepb
 set -e
 # Defaults to fold 1; pass 2, 3 or 4 to run another fold.
-FOLD=2
+FOLD=1
 case "$FOLD" in 1|2|3) ;; *) echo 'Fold must be 1, 2, 3' >&2; exit 1;; esac
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 source /applis/environments/conda.sh
