@@ -6,6 +6,7 @@ import hashlib
 import json
 from collections import Counter
 from pathlib import Path
+import shutil
 
 
 def load_folds(split_dir):
@@ -207,12 +208,21 @@ def main():
         )
 
     run_dir = (
-        args.output_root
-        / f'cap_{args.max_chunks_per_sample}'
-        / f'fold_{args.outer_fold:02d}'
-        / f'seed_{args.seed}'
+    args.output_root
+    / f'cap_{args.max_chunks_per_sample}'
+    / f'fold_{args.outer_fold:02d}'
+    / f'seed_{args.seed}'
     )
+    
+    if run_dir.exists():
+        print(
+            f'WARNING: removing existing run directory: {run_dir}',
+            flush=True,
+        )
+        shutil.rmtree(run_dir)
+    
     run_dir.mkdir(parents=True, exist_ok=False)
+    
     excluded_path = run_dir / 'excluded_samples.csv'
 
     with excluded_path.open('w', newline='') as stream:
