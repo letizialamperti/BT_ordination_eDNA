@@ -7,14 +7,14 @@
 set -e
 # Defaults to fold 1; pass 2, 3 or 4 to run another fold.
 FOLD="${1:-1}"
-case "$FOLD" in 1|2|3|4) ;; *) echo 'Fold must be 1, 2, 3 or 4' >&2; exit 1;; esac
+case "$FOLD" in 1|2|3) ;; *) echo 'Fold must be 1, 2, 3' >&2; exit 1;; esac
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 source /applis/environments/conda.sh
 conda activate zioboia
 python training_BarlowTwins_kfold.py \
     --outer_fold "$FOLD" \
     --samples_dir /bettik/PROJECTS/pr-qiepb/lampertl/all \
-    --split_dir k_cross \
+    --split_dir strict_5km_3fold \
     --output_root runs_bt_bs64 \
     --sequence_length 300 \
     --sample_subset_size 500 \
