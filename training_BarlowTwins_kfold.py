@@ -9,26 +9,72 @@ from pathlib import Path
 
 
 def load_folds(split_dir):
-    paths = sorted(Path(split_dir).glob('new_no_coral_split_4_fold_*.csv'))
-    if len(paths) != 4:
-        raise ValueError('Expected exactly four fold CSVs.')
+    paths = sorted(Path(split_dir).glob('*.csv'))
+
+    if len(paths) < 2:
+        raise ValueError(
+            f'Expected at least two fold CSVs in {split_dir}, found {len(paths)}.'
+        )
+
     folds = []
+
     for path in paths:
         with path.open(newline='') as stream:
             rows = list(csv.DictReader(stream))
+
         if not rows or not {'spygen_code', 'set'} <= rows[0].keys():
             raise ValueError(f'Invalid columns: {path}')
-        codes = [r['spygen_code'] for r in rows]
-        if len(codes) != len(set(codes)) or any(not c or Path(c).name != c for c in codes):
-            raise ValueError(f'Duplicate or invalid sample IDs: {path}')
-        if set(r['set'] for r in rows) != {'train', 'validation'}:
-            raise ValueError(f'Expected train and validation only: {path}')
-        folds.append({r['spygen_code']: r['set'] for r in rows})
+
+        codes = [row['spygen_code'] for row in rows]
+
+        if (
+            len(codes) != len(set(codes))
+            or any(
+                not code or Path(code).name != code
+                for code in codes
+            )
+        ):
+            raise ValueError(
+                f'Duplicate or invalid sample IDs: {path}'
+            )
+
+        sets = {row['set'] for row in rows}
+
+        if sets != {'train', 'validation'}:
+            raise ValueError(
+                f'Expected train and validation only in {path}; found {sorted(sets)}'
+            )
+
+        folds.append({
+            row['spygen_code']: row['set']
+            for row in rows
+        })
+
+    # All fold files must describe exactly the same samples.
     universe = set(folds[0])
-    if any(set(f) != universe for f in folds):
+
+    if any(set(fold) != universe for fold in folds):
         raise ValueError('Fold sample universes differ.')
-    if any(sum(f[c] == 'validation' for f in folds) != 1 for c in universe):
-        raise ValueError('Each sample must be held out exactly once.')
+
+    # In k-fold CV, every sample must appear in validation exactly once.
+    for code in universe:
+        n_validation = sum(
+            fold[code] == 'validation'
+            for fold in folds
+        )
+
+        if n_validation != 1:
+            raise ValueError(
+                f'Sample {code} is held out {n_validation} times; '
+                f'expected exactly once across {len(folds)} folds.'
+            )
+
+    print(
+        f'Loaded {len(folds)} folds from {split_dir}: '
+        f'{[path.name for path in paths]}',
+        flush=True,
+    )
+
     return paths, folds
 
 
