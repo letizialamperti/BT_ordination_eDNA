@@ -14,7 +14,7 @@ conda activate zioboia
 python training_BarlowTwins_kfold.py \
     --outer_fold "$FOLD" \
     --samples_dir /bettik/PROJECTS/pr-qiepb/lampertl/all \
-    --split_dir strict_5km_3fold \
+    --split_dir k_cross_4 \
     --output_root runs_bt_bs64 \
     --sequence_length 300 \
     --sample_subset_size 500 \
