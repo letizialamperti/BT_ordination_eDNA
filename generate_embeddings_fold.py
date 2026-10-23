@@ -13,7 +13,7 @@ from ORDNA.utils.sequence_mapper import SequenceMapper
 # Configuration
 # ============================================================
 
-RUN_DIR = Path("runs_bt_bs64/cap_0/fold_03/seed_0")
+RUN_DIR = Path("runs_bt_bs64/cap_0/fold_04/seed_0")
 CHECKPOINT_PATH = RUN_DIR / "final.ckpt"
 SAMPLE_ROLES_PATH = RUN_DIR / "sample_roles.csv"
 
