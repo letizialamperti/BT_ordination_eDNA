@@ -18,7 +18,7 @@ def main():
     parser.add_argument('--check-only',action='store_true')
     args=parser.parse_args()
     if args.batch_size<1:parser.error('--batch-size must be positive')
-    runs=args.runs_root or args.bt_repo/'runs_bt_bs64/cap_0'
+    runs=args.runs_root or args.bt_repo/'runs_bt_432samples/cap_0'
     env=dict(os.environ,WANDB_MODE='disabled')
     env.setdefault('OMP_NUM_THREADS','1')
     env.setdefault('OPENBLAS_NUM_THREADS','1')
