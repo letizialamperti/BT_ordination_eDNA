@@ -21,6 +21,6 @@ conda activate zioboia
 BT_REPO="${BT_REPO:-/bettik/PROJECTS/pr-qiepb/lampertl/BT_ordination_eDNA}"
 export PYTHONPATH="$BT_REPO${PYTHONPATH:+:$PYTHONPATH}"
 python generate_initial_checkpoints.py \
-    --trained_root "$BT_REPO/runs_bt_432samples" \
+    --trained_root "$BT_REPO/runs_bt_432samples/cap_0" \
     --output_root "$BT_REPO/runs_bt_432samples_initial" \
     --outer_fold "$FOLD"
