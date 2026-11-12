@@ -8,7 +8,7 @@
 set -euo pipefail
 
 # Set the fold before submitting the job.
-FOLD=4
+FOLD=3
 case "$FOLD" in
     1|2|3|4) ;;
     *) echo "FOLD must be 1, 2, 3 or 4." >&2; exit 2 ;;
