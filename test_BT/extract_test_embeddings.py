@@ -1,4 +1,4 @@
-"""Apply frozen BT to28test samples; reproduce a training anchor to verify encoder/classifier pairing."""
+"""Apply frozen BT to28test samples; reproduce a training anchor to verify encoder/reference embedding pairing."""
 import argparse,importlib.util,sys,tempfile
 from pathlib import Path
 import numpy as np
@@ -38,7 +38,7 @@ with tempfile.TemporaryDirectory(prefix='.extract_',dir=out) as temporary:
  difference=float(np.max(np.abs(actual-expected)))
  if not np.allclose(actual,expected,rtol=1e-4,atol=1e-4):
   save_json(out/'anchor_mismatch.json',{'anchor':anchor,'max_absolute_error':difference,'expected':expected.tolist(),'actual':actual.tolist()})
-  raise ValueError('BT checkpoint does not reproduce its frozen training anchor. Do not pair this encoder with these classifiers.')
+  raise ValueError('BT checkpoint does not reproduce its frozen training anchor. Use the checkpoints matching the BT432 reference embeddings.')
  for filename in ['embeddings_preprojector_256D.csv','embeddings_projector_64D.csv','embedding_qc.csv']:
   frame=pd.read_csv(work/filename).set_index('Sample').loc[ids].reset_index()
   assert frame.role.eq('test').all() and len(frame)==28

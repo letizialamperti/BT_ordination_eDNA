@@ -25,9 +25,9 @@ def load_bundle(root=ROOT,extraction_only=False):
  samples=pd.read_csv(root/m['samples_csv'],dtype={'spygen_code':str})
  assert len(samples)==m['n_test_samples']==28 and samples.spygen_code.is_unique and set(samples.role)=={'test'}
  expected={(f,t,s) for f in range(1,5) for t in m['targets'] for s in [0,1,2]}
- assert len(m['models'])==24 and {(r['fold'],r['target'],r['seed']) for r in m['models']}==expected
+ assert extraction_only or len(m['models'])==24 and {(r['fold'],r['target'],r['seed']) for r in m['models']}==expected
  for f,info in m['folds'].items():
-  assert len(info['expected_roles'])==411 and not set(samples.spygen_code)&set(info['expected_roles'])
+  assert len(info['expected_roles'])==432 and not set(samples.spygen_code)&set(info['expected_roles'])
  if extraction_only:return m,samples,None
  labels=pd.read_csv(root/m['labels_csv'],dtype={'spygen_code':str})
  assert len(labels)==28 and labels.spygen_code.is_unique and samples.spygen_code.tolist()==labels.spygen_code.tolist()
@@ -42,10 +42,11 @@ def check_run(run_dir,fold,manifest,samples):
   if not (run_dir/name).is_file():raise FileNotFoundError(run_dir/name)
  cfg=read_json(run_dir/'config.json');roles=pd.read_csv(run_dir/'sample_roles.csv',dtype={'spygen_code':str})
  assert roles.spygen_code.is_unique
- if roles.set_index('spygen_code').role.to_dict()!=manifest['folds'][str(fold)]['expected_roles']:raise ValueError(f'Fold{fold}: encoder roles do not match the frozen BT411 classifiers. Use the411training runs.')
+ if roles.set_index('spygen_code').role.to_dict()!=manifest['folds'][str(fold)]['expected_roles']:raise ValueError(f'Fold{fold}: encoder roles do not match the BT432 fold. Use the matching spatial training runs.')
  assert not set(samples.spygen_code)&set(roles.spygen_code)
- for key,wanted in {'outer_fold':fold,'seed':0,'sequence_length':300,'sample_subset_size':500,'sample_repr_dim':256,'sample_emb_dim':64,'max_chunks_per_sample':0}.items():
+ for key,wanted in {'outer_fold':fold,'seed':0,'sequence_length':300,'sample_subset_size':500,'sample_repr_dim':256,'sample_emb_dim':64}.items():
   if cfg.get(key)!=wanted:raise ValueError(f'{run_dir}: expected {key}={wanted}, found {cfg.get(key)}')
+ if cfg.get('max_chunks_per_sample',0)!=0:raise ValueError(f'{run_dir}: expected an uncapped BT432 run')
  return cfg
 
 def predict_one(model_info,x,root=ROOT):

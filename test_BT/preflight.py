@@ -12,7 +12,7 @@ ids=set(samples.spygen_code)
 for fold in range(1,5):
  run=a.runs_root/f'fold_{fold:02d}/seed_0';cfg=check_run(run,fold,m,samples)
  ids.add(m['folds'][str(fold)]['anchor_id'])
- print(f'OK fold{fold}: final.ckpt,411roles, configuration, no test overlap',flush=True)
+ print(f'OK fold{fold}: final.ckpt,432 roles, configuration, no test overlap',flush=True)
 for code in sorted(ids):
  if not (a.samples_dir/f'{code}.csv').is_file():raise FileNotFoundError(a.samples_dir/f'{code}.csv')
 print('Embedding-only preflight passed. No classifiers or test labels are needed on this server. Checkpoint pairing will be checked with a frozen training anchor.')

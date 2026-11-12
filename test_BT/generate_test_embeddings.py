@@ -13,7 +13,7 @@ def main():
     parser.add_argument('--bt-repo',type=Path,default=os.environ.get('BT_REPO',DEFAULT_BT_REPO))
     parser.add_argument('--runs-root',type=Path,default=os.environ.get('RUNS_ROOT'))
     parser.add_argument('--samples-dir',type=Path,default=os.environ.get('SAMPLES_DIR','/bettik/PROJECTS/pr-qiepb/lampertl/all'))
-    parser.add_argument('--output-dir',type=Path,default=os.environ.get('OUTPUT_DIR',str(ROOT/'test_embeddings')))
+    parser.add_argument('--output-dir',type=Path,default=os.environ.get('OUTPUT_DIR',str(ROOT/'test_embeddings_BT432')))
     parser.add_argument('--batch-size',type=int,default=int(os.environ.get('EMBEDDING_BATCH_SIZE','64')))
     parser.add_argument('--check-only',action='store_true')
     args=parser.parse_args()
@@ -30,7 +30,7 @@ def main():
         subprocess.run([sys.executable,str(ROOT/'extract_test_embeddings.py'),'--fold',str(fold),*common,
                         '--output-dir',str(args.output_dir),'--batch-size',str(args.batch_size)],env=env,check=True)
     print(f'Test embeddings saved in: {args.output_dir.resolve()}',flush=True)
-    print('Copy the entire test_embeddings directory to the local computer for classification.',flush=True)
+    print('Copy the entire output directory to the local computer for classification.',flush=True)
 
 if __name__=='__main__':
     main()
