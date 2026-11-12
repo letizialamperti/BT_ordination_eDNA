@@ -13,8 +13,8 @@ from ORDNA.utils.sequence_mapper import SequenceMapper
 # Configuration
 # ============================================================
 
-RUN_DIR = Path("runs_bt_432samples/cap_0/fold_02/seed_0")
-CHECKPOINT_PATH = Path("runs_bt_432samples_initial/fold_02/seed_0/initial.ckpt")
+RUN_DIR = Path("runs_bt_432samples/cap_0/fold_03/seed_0")
+CHECKPOINT_PATH = Path("runs_bt_432samples_initial/fold_03/seed_0/initial.ckpt")
 SAMPLE_ROLES_PATH = RUN_DIR / "sample_roles.csv"
 
 SAMPLE_DIR = Path("/bettik/PROJECTS/pr-qiepb/lampertl/all")
