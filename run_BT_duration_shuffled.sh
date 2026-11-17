@@ -17,7 +17,7 @@ esac
 
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 # Directory containing the completed one-epoch training runs.
-CHECKPOINT_ROOT=runs_bt_432samples
+CHECKPOINT_ROOT=runs_bt_432samples/cap_0
 FOLD_NAME=$(printf 'fold_%02d' "$FOLD")
 RESUME_CHECKPOINT="$CHECKPOINT_ROOT/$FOLD_NAME/seed_0/final.ckpt"
 
