@@ -31,13 +31,17 @@ case "$VIEWS" in
 esac
 
 for VIEW_MODE in "${VIEW_MODES[@]}"; do
+    VIEW_OUTPUT="runs_bt_duration_432samples/$VIEW_MODE"
+    if [[ "$VIEW_MODE" == shuffled ]]; then
+        VIEW_OUTPUT="runs_bt_duration_432samples/shuffled_reindexed"
+    fi
     python training_BarlowTwins_duration.py \
         --views "$VIEW_MODE" \
         --resume_checkpoint "$RESUME_CHECKPOINT" \
         --outer_fold "$FOLD" \
         --samples_dir /bettik/PROJECTS/pr-qiepb/lampertl/all \
         --split_dir k_cross_4 \
-        --output_root "runs_bt_duration_432samples/$VIEW_MODE" \
+        --output_root "$VIEW_OUTPUT" \
         --sequence_length 300 \
         --sample_subset_size 500 \
         --batch_size 64 \

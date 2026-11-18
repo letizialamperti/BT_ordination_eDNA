@@ -3,13 +3,24 @@ import argparse
 import ast
 import json
 import hashlib
+import inspect
 import shutil
 import sys
 from pathlib import Path
 
 
-def add_checkpoints(source):
+def add_checkpoints(source, shuffled=False):
     tree = ast.parse(source)
+    if shuffled:
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            name = node.func.id if isinstance(node.func, ast.Name) else (
+                node.func.attr if isinstance(node.func, ast.Attribute) else None)
+            if name == "DataLoader":
+                for keyword in node.keywords:
+                    if keyword.arg == "persistent_workers":
+                        keyword.value = ast.Constant(False)
     trainers = [
         node for node in ast.walk(tree)
         if isinstance(node, ast.Call)
@@ -102,7 +113,9 @@ def main():
 
     def make_duration_dataset(*dataset_args, **dataset_kwargs):
         dataset = BarlowTwinsDataset(*dataset_args, **dataset_kwargs)
-        datasets.append((dataset, list(dataset.files)))
+        bound = inspect.signature(BarlowTwinsDataset).bind(*dataset_args, **dataset_kwargs)
+        bound.apply_defaults()
+        datasets.append((dataset, list(dataset.files), dict(bound.arguments)))
         return dataset
 
     def prepare_views(run_dir, epoch):
@@ -114,7 +127,7 @@ def main():
             shutil.rmtree(cache)
         cache.mkdir()
         manifest = []
-        for dataset, original_files in datasets:
+        for dataset, original_files, dataset_options in datasets:
             shuffled_files = []
             for source in original_files:
                 source = Path(source)
@@ -127,7 +140,16 @@ def main():
                 shuffled_files.append(output)
                 manifest.append({"sample": source.stem, "rows": len(frame), "seed": sample_seed})
                 del frame, order
-            dataset.files = shuffled_files
+            # Rebuild byte ranges, CSV layouts and file stats after rewriting the CSVs.
+            options = {**dataset_options, "sample_files": shuffled_files}
+            refreshed = BarlowTwinsDataset(**options)
+            if [Path(p).name for p in refreshed.files] != [Path(p).name for p in original_files]:
+                raise ValueError("Shuffling changed the accepted training samples.")
+            if refreshed.accumulated_num_subsets != dataset.accumulated_num_subsets:
+                raise ValueError("Shuffling changed the number of chunks per training sample.")
+            # DataLoader and its sampler retain this dataset instance.
+            dataset.__dict__.clear()
+            dataset.__dict__.update(refreshed.__dict__)
         (run_dir / f"shuffle_epoch_{epoch:02d}.json").write_text(json.dumps({
             "epoch": epoch, "seed": config["seed"], "samples": manifest,
             "paired_rows_kept_together": True, "sample_chunk_counts_unchanged": True,
@@ -167,7 +189,7 @@ def main():
 
     trainer_path = Path(__file__).resolve().with_name("training_BarlowTwins_kfold.py")
     source = trainer_path.read_text()
-    tree = add_checkpoints(source)
+    tree = add_checkpoints(source, shuffled=args.views == "shuffled")
     namespace = {
         "__name__": "__main__",
         "__file__": str(trainer_path),
