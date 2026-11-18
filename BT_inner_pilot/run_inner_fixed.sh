@@ -11,15 +11,17 @@ BT_REPO=/bettik/PROJECTS/pr-qiepb/lampertl/BT_ordination_eDNA
 VIEWS=fixed
 MAX_EPOCHS=10
 
+source "$BUNDLE/job_logging.sh"
 source /applis/environments/conda.sh
 conda activate zioboia
 export PYTHONPATH="$BT_REPO${PYTHONPATH:+:$PYTHONPATH}"
 export WANDB_MODE=disabled
+export BT_SHUFFLE_SCRATCH=/var/tmp
 
-python "$BUNDLE/train_bt_inner_pilot.py" \
+python -u "$BUNDLE/train_bt_inner_pilot.py" \
     --roles "$BUNDLE/splits/sample_roles.csv" \
     --samples_dir /bettik/PROJECTS/pr-qiepb/lampertl/all \
-    --output_root "$BT_REPO/runs_bt_inner_pilot" \
+    --output_root "$BT_REPO/runs_bt_inner_pilot_io_retry" \
     --views "$VIEWS" \
     --max_epochs "$MAX_EPOCHS" \
     --sequence_length 300 --sample_subset_size 500 --batch_size 64 \

@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "checks": [
+    "1764 batch-size/length combinations retain every chunk with no singleton",
+    "duplicate IDs, unsafe paths and overlapping spatial roles rejected",
+    "exclusive run lock rejects a competing writer",
+    "preflight indexes both roles and exercises indexed views without outer CSV",
+    "fixed: real BT model trains/validates/saves; resumed weights equal uninterrupted weights exactly",
+    "shuffled: real BT model trains/validates/saves; resumed weights equal uninterrupted weights exactly",
+    "fixed/shuffled initial weights identical; temporary shuffled CSVs cleaned",
+    "real frozen export: 256D/64D outputs, sample roles, manifests and cached re-export",
+    "export rejects an outer sample relabelled as training",
+    "classifier: 2 checkpoints x 3 targets x 3 seeds, frozen sample roles"
+  ],
+  "workers": 2,
+  "source_sha256": {
+    "train_bt_inner_pilot.py": "97f168564daaa00d299776660ed4d9134fef3da1c3045a3555794d7420769918",
+    "pilot_checks.py": "8a5a837f5c1cdffff795384e641e9ca88aa7ae31ac6fdb790ff6ded8607d3581",
+    "prepare_splits.py": "dcaa781efd16ae6a0ed9a5c0f4ce26fef1c62917c36fb73099a29ecd27278b06",
+    "evaluate_inner_classification.py": "35f18176c31d545e8cdcc24ba66a2a022a7924bba09db6e0059fb853d1075447",
+    "verify_pipeline.py": "19ffc05ab4fe5b2bb7955bd743ff9d05c37abbd9e2c85dd428b0521e9ee589e4",
+    "export_inner_embeddings.py": "6397c1b1076eaca3a6e2294b9c89e743f0e34028cac2876fa49ced61cd06a80a"
+  },
+  "torch": "2.2.2",
+  "bt_reference_source": "https://github.com/letizialamperti/BT_ordination_eDNA/tree/main",
+  "bt_reference_sha256": {
+    "ORDNA/utils/sequence_mapper.py": "acc566ab1c4a47551806cb7d72f502a29ce64aae294c03debc74417ae5519bf9",
+    "ORDNA/utils/constants.py": "96563d990763cc5ed94e2a07045268ad09560309a795b46007d7df375dc768ec",
+    "ORDNA/models/representation_module.py": "6cdde0f68d1ea68a7d955032880e1fdbc6ea62ff395b7642083ac7b7f4f7422e",
+    "ORDNA/models/barlow_twins.py": "9343e90f04e3d3026c149f41d0860a8874e96ccb9dbeb41e596052d9a8accf99",
+    "ORDNA/data/barlow_twins_dataset.py": "95d53e45b477503775b2acb20201a63fdada15338387889d31ae696725f2a0fd"
+  }
+}

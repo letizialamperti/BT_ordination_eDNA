@@ -12,6 +12,7 @@ from sklearn.metrics import balanced_accuracy_score, accuracy_score, f1_score
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
+from pilot_checks import read_roles, run_lock, atomic_json
 
 
 def sha(path):
@@ -24,9 +25,16 @@ def main():
     parser.add_argument("--metadata", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--classifier-epochs", type=int, default=20)
+    parser.add_argument("--roles", type=Path, default=Path(__file__).parent / "splits/classifier_roles.csv")
     args = parser.parse_args()
     if args.classifier_epochs < 1:
         parser.error("--classifier-epochs must be positive.")
+    with run_lock(args.output, ".classification.lock"):
+        evaluate(args)
+
+
+def evaluate(args):
+    expected_roles = read_roles(args.roles, include_outer=False).set_index("spygen_code").role
     paths = [args.embeddings_root / "initial/embeddings_preprojector_256D.csv",
              *sorted(args.embeddings_root.glob("epoch_*/embeddings_preprojector_256D.csv"))]
     if not all(p.is_file() for p in paths):
@@ -34,12 +42,14 @@ def main():
     if len(paths) < 2:
         raise ValueError("Export the initial encoder and at least one trained checkpoint.")
     metadata = pd.read_csv(args.metadata, sep=";").set_index("spygen_code")
-    assert metadata.index.is_unique
+    if not metadata.index.is_unique:
+        raise ValueError("Metadata sample IDs must be unique.")
     features = [f"Dim{i}" for i in range(1, 257)]
     protocol = dict(
         epochs=args.classifier_epochs, seeds=[0,1,2], architecture="256-32-ReLU-dropout0.3-logits",
         lr=.0003, weight_decay=.001, batch_size=16, class_weights="inverse training frequency normalized mean1",
         metadata_sha256=sha(args.metadata),
+        roles_sha256=sha(args.roles), evaluator_sha256=sha(__file__),
         embeddings_sha256={str(p): sha(p) for p in paths},
         outer_scoring=False, inner_score_used_to_compare_SS_checkpoints=True,
     )
@@ -47,24 +57,32 @@ def main():
     record = args.output / "classifier_protocol.json"
     if record.exists() and json.loads(record.read_text()) != protocol:
         raise ValueError("Existing output uses a different protocol or embeddings. Select a fresh output.")
-    record.write_text(json.dumps(protocol, indent=2) + "\n")
+    atomic_json(record, protocol)
     torch.set_num_threads(1)
     rows = []
     reference = None
     for path in paths:
         frame = pd.read_csv(path).sort_values("Sample").reset_index(drop=True)
-        assert frame.Sample.is_unique and set(frame.role) == {"inner_train", "inner_validation"}
+        if not frame.Sample.is_unique or set(frame.Sample) != set(expected_roles.index):
+            raise ValueError(f"Embedding samples differ from frozen classifier cohort: {path}")
+        if frame.role.tolist() != expected_roles.reindex(frame.Sample).tolist():
+            raise ValueError(f"Embedding roles differ from frozen classifier split: {path}")
         if reference is None:
             reference = frame[["Sample", "role"]]
         else:
-            assert frame[["Sample", "role"]].equals(reference)
+            if not frame[["Sample", "role"]].equals(reference):
+                raise ValueError("Checkpoint sample order or roles differ.")
         tr = frame.role.eq("inner_train").to_numpy()
         va = ~tr
         values = frame[features].to_numpy(dtype="float32")
-        assert np.isfinite(values).all()
+        if not np.isfinite(values).all():
+            raise ValueError(f"Non-finite embedding values: {path}")
         scaler = StandardScaler().fit(values[tr])
         x = scaler.transform(values).astype("float32")
-        index = metadata.loc[frame.Sample, "Index_MPA_num"].replace({4: 3}).to_numpy()
+        index = pd.to_numeric(metadata.loc[frame.Sample, "Index_MPA_num"], errors="raise")
+        if not index.isin([1, 2, 3, 4, 5]).all():
+            raise ValueError("Missing or unexpected Index_MPA_num labels.")
+        index = index.replace({4: 3}).to_numpy()
         targets = {
             "unprotected_vs_protected": (index > 1).astype("int64"),
             "protection": (index == 5).astype("int64"),
@@ -72,7 +90,8 @@ def main():
         }
         for target, y in targets.items():
             classes = 4 if target == "Index_MPA_num" else 2
-            assert set(y[tr]) == set(y[va]) == set(range(classes))
+            if set(y[tr]) != set(range(classes)) or set(y[va]) != set(range(classes)):
+                raise ValueError(f"A class is missing from training or validation: {target}")
             for seed in [0, 1, 2]:
                 random.seed(seed)
                 np.random.seed(seed)

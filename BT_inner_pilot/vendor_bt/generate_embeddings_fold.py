@@ -49,18 +49,18 @@ def clean_sample_dataframe(file_path: Path) -> pd.DataFrame:
     df = pd.read_csv(
         file_path,
         usecols=["Forward", "Reverse"],
+        dtype=str,
+        keep_default_na=False,
     )
 
     original_rows = len(df)
 
-    # Remove NaN pairs.
-    df = df.dropna(subset=["Forward", "Reverse"])
-
-    # Remove empty/whitespace-only sequences.
-    valid_mask = (
-        df["Forward"].astype(str).str.strip().ne("")
-        & df["Reverse"].astype(str).str.strip().ne("")
-    )
+    # Match the indexed training dataset: trim reads and discard missing pairs.
+    missing = {"", "na", "nan", "none", "null", "<na>", "n/a"}
+    for column in ["Forward", "Reverse"]:
+        df[column] = df[column].str.strip()
+    valid_mask = (~df.Forward.str.lower().isin(missing)
+                  & ~df.Reverse.str.lower().isin(missing))
 
     df = df.loc[valid_mask].reset_index(drop=True)
 
