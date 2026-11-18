@@ -1,0 +1,15 @@
+{
+  "outer_fold": 1,
+  "inner_fold": 2,
+  "counts": {
+    "inner_train": 215,
+    "inner_validation": 109,
+    "outer_eval": 108
+  },
+  "source_sha256": {
+    "new_no_coral_split_4_fold_01.csv": "f17627ec0b55ddbe241788145afbc2719220f25875776ed587753c07bffe1eab",
+    "new_no_coral_split_4_fold_02.csv": "bf908bf78a0839280ed88bd9219822d5390dc03fce891992b3216e603c02d29a",
+    "new_no_coral_split_4_fold_03.csv": "44b0f7523724e205ec5c8b72ddc9b1a6c63221cdc6f6c370ba8302fcbf37e0df",
+    "new_no_coral_split_4_fold_04.csv": "8384167006b463311b220caee78ab5a22165eb4ce5d389ccf0815ac85b6263cb"
+  }
+}
