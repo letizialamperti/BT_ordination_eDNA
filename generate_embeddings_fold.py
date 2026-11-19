@@ -14,7 +14,7 @@ from ORDNA.utils.sequence_mapper import SequenceMapper
 # ============================================================
 
 RUN_DIR = Path("runs_bt_duration_432samples/fixed/cap_0/fold_01/seed_0")
-CHECKPOINT_PATH = RUN_DIR / "final.ckpt"
+CHECKPOINT_PATH = RUN_DIR / "epoch_02.ckpt"
 SAMPLE_ROLES_PATH = RUN_DIR / "sample_roles.csv"
 
 SAMPLE_DIR = Path("/bettik/PROJECTS/pr-qiepb/lampertl/all")
