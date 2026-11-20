@@ -1,0 +1,19 @@
+{
+  "status": "PASS",
+  "checks": [
+    "Trainer, dataset interface, exporter, classifier and logging helper copied byte-for-byte from audited pilot",
+    "Both rotations contain only the same 411 IDs, exclude all 21 extras, and hold outer block 1 out",
+    "All 8 launchers: shebang/LF, OAR allocation, bash syntax and invoked roles, epochs, modes and output paths",
+    "Synthetic end-to-end local evaluation: 72 scores, 12 target/rotation cells, equal-weight candidate ranking, no outer scoring",
+    "Selection rejects a run pretrained on an extra sample before any classifier fit"
+  ],
+  "python_files_sha256": {
+    "train_bt_inner_pilot.py": "97f168564daaa00d299776660ed4d9134fef3da1c3045a3555794d7420769918",
+    "pilot_checks.py": "8a5a837f5c1cdffff795384e641e9ca88aa7ae31ac6fdb790ff6ded8607d3581",
+    "prepare_experiment.py": "c09fcd148743bfd30a90dc1e04ed2fe9f30ca2d6470b91b03187dc003ee85d34",
+    "evaluate_inner_classification.py": "35f18176c31d545e8cdcc24ba66a2a022a7924bba09db6e0059fb853d1075447",
+    "evaluate_selection.py": "5e3ccedce8317e34c33eacb3c85fd6d558b0c39f628302e1f2733c04f44b6db6",
+    "export_inner_embeddings.py": "ea54f27f6fbdb6909ac442ccbcde1da699ffaebd4a8f37c593b24bbd93985024",
+    "vendor_bt/generate_embeddings_fold.py": "1b7ce9aa8d02093670e1882181b78d03bac293b43802c0ed11276ec7efb8a3aa"
+  }
+}

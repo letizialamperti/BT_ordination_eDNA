@@ -1,0 +1,71 @@
+{
+  "cohort_size": 411,
+  "outer_fold": 1,
+  "inner_folds": [
+    2,
+    3
+  ],
+  "encoder_seed": 0,
+  "candidates": [
+    {
+      "views": "fixed",
+      "epochs": 2
+    },
+    {
+      "views": "shuffled",
+      "epochs": 6
+    }
+  ],
+  "encoder_representation_dim": 256,
+  "projector_dim": 64,
+  "classifier": {
+    "epochs": 20,
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "model": "standardized softmax32",
+    "class_weights": "inverse training frequency normalized mean1"
+  },
+  "targets": [
+    "unprotected_vs_protected",
+    "protection",
+    "Index_MPA_num"
+  ],
+  "selection": {
+    "primary": "mean inner balanced accuracy, equal weight per target and rotation, after averaging classifier seeds",
+    "exact_tie": "fixed2, lower computational cost",
+    "report": "target-wise and rotation-wise differences and classifier-seed variability",
+    "outer_scoring": false,
+    "exploratory": true
+  },
+  "cohort_source": "embedding_k4_411samples/fold_01/embeddings_preprojector_256D.csv",
+  "cohort_source_sha256": "09b813d13db9a97ae63418f544fa51b7c2bf06ae04496ca89eb1a36eb81c50e2",
+  "spatial_roles_source": "Classifier_BT_SL_WP3_DNAi/BT_inner_pilot/splits/sample_roles.csv",
+  "spatial_roles_sha256": "b2726781654aa0fe9434dc1869c465fede9fcb02248cf324a8181c2feb93eb25",
+  "rotations": {
+    "2": {
+      "counts": {
+        "inner_train": 209,
+        "inner_validation": 107,
+        "outer_eval": 95
+      },
+      "training_blocks": [
+        3,
+        4
+      ]
+    },
+    "3": {
+      "counts": {
+        "inner_train": 194,
+        "inner_validation": 122,
+        "outer_eval": 95
+      },
+      "training_blocks": [
+        2,
+        4
+      ]
+    }
+  }
+}
