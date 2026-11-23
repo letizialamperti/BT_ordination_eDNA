@@ -1,0 +1,26 @@
+{
+  "status": "PASS",
+  "folds": [
+    {
+      "fold": 1,
+      "header_and_arguments": "PASS",
+      "export_skipped_if_training_fails": "PASS"
+    },
+    {
+      "fold": 2,
+      "header_and_arguments": "PASS",
+      "export_skipped_if_training_fails": "PASS"
+    },
+    {
+      "fold": 3,
+      "header_and_arguments": "PASS",
+      "export_skipped_if_training_fails": "PASS"
+    },
+    {
+      "fold": 4,
+      "header_and_arguments": "PASS",
+      "export_skipped_if_training_fails": "PASS"
+    }
+  ],
+  "submission": "Four independent non-blocking OAR submissions"
+}

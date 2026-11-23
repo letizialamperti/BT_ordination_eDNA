@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "workers": 0,
+  "checks": [
+    "All four outer splits share 411 IDs; outer counts 95/107/122/87",
+    "Real BT model trains exactly six shuffled epochs without opening absent outer CSVs or validating",
+    "Completed training is verified and skipped on pipeline relaunch",
+    "Resume from epoch 5 reproduces final weights exactly and avoids versioned epoch duplicates",
+    "Final export includes train and held-out samples, with 256D/64D outputs and per-sample manifests",
+    "Interrupted export reuses sample transactions; complete exports are hash-verified and skipped",
+    "Incremental export matches original single-pass embeddings for every sample and both layers",
+    "Changed raw training input is rejected on relaunch"
+  ],
+  "source_sha256": {
+    "pilot_checks.py": "8a5a837f5c1cdffff795384e641e9ca88aa7ae31ac6fdb790ff6ded8607d3581",
+    "final_checks.py": "d1780761c0442577d1fddaddac950a16fdad47b5ee5e043aca8b58fd3ceaf33c",
+    "verify_pipeline.py": "e3256843bdaa2b1722459e7d796be8b4969de77ac6bfbeb265f6997a18e0fe43",
+    "export_final.py": "d991a0cb56a9ba1991bf20056b18ec541a306e6a61c6947f096f9277dadbd1ba",
+    "training_core.py": "97f168564daaa00d299776660ed4d9134fef3da1c3045a3555794d7420769918",
+    "train_final.py": "cb03f75d4c1acfd7254abcd83350509f3b6608da113c6d0fcc39c70fcb99ca04",
+    "vendor_bt/generate_embeddings_fold.py": "1ff6fa5584998b6e805e39687cbdfa2a21eaf5006f82c54c52931eafed92acae"
+  }
+}
