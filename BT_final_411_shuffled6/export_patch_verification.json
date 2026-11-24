@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "checks": [
+    "All three valid output schemas accepted",
+    "Header-only 64D CSV rejected with exact row count",
+    "All failed CSVs and diagnostics survive outside temporary work directory",
+    "Old verified exporter may migrate only its exporter hash",
+    "Checkpoint/generator/roles/config/batch changes remain rejected"
+  ],
+  "exporter_sha256": "4e2983128a9343749f9fe8c9610133bf3eb405862c3d1b7a376400610ce51aa5",
+  "export_only_launchers": "PASS: 4 OAR launchers, one export call, no training"
+}

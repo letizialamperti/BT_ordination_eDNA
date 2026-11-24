@@ -1,9 +1,12 @@
 """Export the frozen six-epoch model for train and outer IDs, resuming per sample."""
 import argparse
+import csv
 import importlib.util
 import json
 from pathlib import Path
+import shutil
 import tempfile
+import uuid
 
 import numpy as np
 import pandas as pd
@@ -12,16 +15,77 @@ from final_checks import sha, read_roles, file_stats, run_lock, atomic_json
 
 HERE = Path(__file__).resolve().parent
 NAMES = ["embeddings_preprojector_256D.csv", "embeddings_projector_64D.csv", "embedding_qc.csv"]
+COMPATIBLE_EXPORTERS = {"d991a0cb56a9ba1991bf20056b18ec541a306e6a61c6947f096f9277dadbd1ba"}
+
+
+def check_protocol(record, expected, directory):
+    differences = {k for k, value in expected.items() if record.get(k) != value}
+    if not differences:
+        return
+    # Validation/diagnostic-only update: model, generator, data, pooling, batch,
+    # checkpoint and source statistics must ALL be unchanged.
+    if differences == {"exporter_sha256"} and record.get("exporter_sha256") in COMPATIBLE_EXPORTERS:
+        print(f"Compatible validation-only exporter update: {directory}; cached values remain unchanged", flush=True)
+        return
+    raise ValueError(f"Export protocol or input changed: {directory}; fields={sorted(differences)}")
 
 
 def verified(directory, record, expected=None):
-    if expected is not None and any(record.get(k) != v for k, v in expected.items()):
-        raise ValueError(f"Export protocol or input changed: {directory}")
+    if expected is not None:
+        check_protocol(record, expected, directory)
     if set(record.get("output_sha256", {})) != set(NAMES):
         raise ValueError(f"Incomplete export manifest: {directory}")
     for name, digest in record["output_sha256"].items():
         if not (directory / name).is_file() or sha(directory / name) != digest:
             raise ValueError(f"Changed cached export: {directory / name}")
+
+
+def validate_outputs(work, sample, role):
+    """Validate the whole sample before publishing any of its three CSVs."""
+    for name in NAMES:
+        path = work / name
+        try:
+            frame = pd.read_csv(path, dtype={"Sample": str, "role": str})
+        except Exception as exc:
+            raise ValueError(f"{sample}/{name}: CSV cannot be read ({type(exc).__name__}: {exc})") from exc
+        actual = {c: frame[c].iloc[0] if len(frame) else None for c in ["Sample", "role"] if c in frame}
+        if len(frame) != 1 or actual.get("Sample") != sample or actual.get("role") != role:
+            raise ValueError(f"{sample}/{name}: expected one row with Sample={sample!r}, role={role!r}; "
+                             f"got rows={len(frame)}, columns={len(frame.columns)}, identifiers={actual!r}")
+        if name != "embedding_qc.csv":
+            size = 256 if "256D" in name else 64
+            columns = [f"Dim{i}" for i in range(1, size+1)] + [f"Standard_dev_{i}" for i in range(1, size+1)]
+            missing = [c for c in columns if c not in frame]
+            if missing or len(frame.columns) != 2 + 2*size:
+                raise ValueError(f"{sample}/{name}: missing columns {missing[:8]}; actual column count={len(frame.columns)}")
+            if not np.isfinite(frame[columns].to_numpy(dtype=float)).all():
+                raise FloatingPointError(f"{sample}/{name}: non-finite mean or standard deviation")
+        elif frame.embedding_status.iloc[0] != "ok" or frame.full_subsets.iloc[0] < 1:
+            raise ValueError(f"{sample}/{name}: no complete usable inference subset")
+
+
+def preserve_failure(work, directory, sample, role, error):
+    destination = directory / "_diagnostics" / uuid.uuid4().hex
+    destination.mkdir(parents=True)
+    information = dict(Sample=sample, role=role, error_type=type(error).__name__, error=str(error), files={})
+    for name in NAMES:
+        source = work / name
+        if not source.exists():
+            information["files"][name] = {"exists": False}
+            continue
+        shutil.copy2(source, destination / name)
+        item = dict(exists=True, bytes=source.stat().st_size, sha256=sha(source))
+        try:
+            with source.open(newline="") as stream:
+                rows = list(csv.reader(stream))
+            item.update(csv_record_count=len(rows), field_counts=[len(r) for r in rows[:3]],
+                        first_data_identifiers=rows[1][:2] if len(rows)>1 else [])
+        except Exception as exc:
+            item["read_error"] = str(exc)
+        information["files"][name] = item
+    atomic_json(destination / "failure.json", information)
+    print(f"Preserved failed sample diagnostics: {destination}", flush=True)
+    return destination
 
 
 def main():
@@ -68,8 +132,13 @@ def export(args):
         print(f"Verified completed final embeddings: {output}", flush=True)
         return
     protocol = output / "export_protocol.json"
-    if protocol.exists() and json.loads(protocol.read_text()) != expected:
-        raise ValueError("Partial export inputs or code changed; preserve and inspect this output.")
+    if protocol.exists():
+        old_protocol = json.loads(protocol.read_text())
+        check_protocol(old_protocol, expected, output)
+        if old_protocol != expected:
+            archive = output / f"export_protocol_before_{old_protocol['exporter_sha256'][:12]}.json"
+            if not archive.exists():
+                atomic_json(archive, old_protocol)
     atomic_json(protocol, expected)
     atomic_json(run / "progress.json", dict(phase="initializing_export", total_samples=len(roles)))
     spec = importlib.util.spec_from_file_location("frozen_export", HERE / "vendor_bt/generate_embeddings_fold.py")
@@ -104,13 +173,17 @@ def export(args):
                 module.SAMPLE_ROLES_PATH = work / "roles.csv"
                 module.OUTPUT_DIR = work
                 module.PREPROJECTOR_OUTPUT, module.PROJECTOR_OUTPUT, module.QC_OUTPUT = [work / n for n in NAMES]
-                module.main(model=model)
+                try:
+                    module.main(model=model)
+                    validate_outputs(work, row.spygen_code, row.role)
+                except Exception as exc:
+                    diagnostic = "unavailable"
+                    try:
+                        diagnostic = preserve_failure(work, directory, row.spygen_code, row.role, exc)
+                    except Exception as preservation_error:
+                        print(f"Could not preserve diagnostics: {preservation_error}", flush=True)
+                    raise RuntimeError(f"Export failed for {row.spygen_code}: {exc}. Diagnostics: {diagnostic}") from exc
                 for name in NAMES:
-                    frame = pd.read_csv(work / name)
-                    if len(frame) != 1 or frame.Sample.iloc[0] != row.spygen_code or frame.role.iloc[0] != row.role:
-                        raise ValueError(f"Incomplete inference subset or invalid output: {row.spygen_code}/{name}")
-                    if name != "embedding_qc.csv" and not np.isfinite(frame.filter(regex=r"^(Dim|Std)").to_numpy()).all():
-                        raise FloatingPointError(f"Non-finite embedding: {row.spygen_code}")
                     (work / name).replace(directory / name)
             if file_stats([args.samples_dir / f"{row.spygen_code}.csv"])[str((args.samples_dir / f"{row.spygen_code}.csv").resolve())] != sample_input["source_stat"]:
                 raise RuntimeError(f"Input changed during export: {row.spygen_code}")
