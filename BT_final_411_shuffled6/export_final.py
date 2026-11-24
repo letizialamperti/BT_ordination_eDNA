@@ -3,9 +3,11 @@ import argparse
 import csv
 import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
 import tempfile
+import sys
 import uuid
 
 import numpy as np
@@ -15,7 +17,12 @@ from final_checks import sha, read_roles, file_stats, run_lock, atomic_json
 
 HERE = Path(__file__).resolve().parent
 NAMES = ["embeddings_preprojector_256D.csv", "embeddings_projector_64D.csv", "embedding_qc.csv"]
-COMPATIBLE_EXPORTERS = {"d991a0cb56a9ba1991bf20056b18ec541a306e6a61c6947f096f9277dadbd1ba"}
+COMPATIBLE_EXPORTERS = {"d991a0cb56a9ba1991bf20056b18ec541a306e6a61c6947f096f9277dadbd1ba",
+                        "4e2983128a9343749f9fe8c9610133bf3eb405862c3d1b7a376400610ce51aa5"}
+
+
+class CachedOutputError(ValueError):
+    pass
 
 
 def check_protocol(record, expected, directory):
@@ -24,8 +31,8 @@ def check_protocol(record, expected, directory):
         return
     # Validation/diagnostic-only update: model, generator, data, pooling, batch,
     # checkpoint and source statistics must ALL be unchanged.
-    if differences == {"exporter_sha256"} and record.get("exporter_sha256") in COMPATIBLE_EXPORTERS:
-        print(f"Compatible validation-only exporter update: {directory}; cached values remain unchanged", flush=True)
+    if differences.issubset({"exporter_sha256", "io_source_sha256", "io_strategy"}) and record.get("exporter_sha256") in COMPATIBLE_EXPORTERS:
+        print(f"Compatible export I/O update: {directory}; model and numerical recipe unchanged", flush=True)
         return
     raise ValueError(f"Export protocol or input changed: {directory}; fields={sorted(differences)}")
 
@@ -34,10 +41,10 @@ def verified(directory, record, expected=None):
     if expected is not None:
         check_protocol(record, expected, directory)
     if set(record.get("output_sha256", {})) != set(NAMES):
-        raise ValueError(f"Incomplete export manifest: {directory}")
+        raise CachedOutputError(f"Incomplete export manifest: {directory}")
     for name, digest in record["output_sha256"].items():
         if not (directory / name).is_file() or sha(directory / name) != digest:
-            raise ValueError(f"Changed cached export: {directory / name}")
+            raise CachedOutputError(f"Changed cached export: {directory / name}")
 
 
 def validate_outputs(work, sample, role):
@@ -93,6 +100,8 @@ def main():
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--samples-dir", type=Path, required=True)
     parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--scratch-dir", type=Path, default=os.environ.get("BT_SHUFFLE_SCRATCH"),
+                        help="Node-local staging (the OAR launchers use /var/tmp)")
     args = parser.parse_args()
     if args.batch_size < 1:
         parser.error("batch-size must be positive")
@@ -101,108 +110,8 @@ def main():
 
 
 def export(args):
-    run = args.run_dir
-    config = json.loads((run / "config.json").read_text())
-    complete = json.loads((run / "training_complete.json").read_text())
-    checkpoint = run / "final.ckpt"
-    checkpoint_sha = sha(checkpoint)
-    if (complete["completed_epochs"] != 6 or complete["checkpoint_sha256"] != checkpoint_sha
-        or complete["config_sha256"] != sha(run / "config.json")):
-        raise ValueError("Completed six-epoch training not verified.")
-    role_path = run / "sample_roles.csv"
-    if sha(role_path) != config["roles_sha256"]:
-        raise ValueError("Frozen outer roles changed.")
-    roles = read_roles(role_path, config["outer_fold"], config["smoke_test"])
-    paths = [args.samples_dir / f"{code}.csv" for code in roles.spygen_code]
-    stats = file_stats(paths)
-    training_paths = [args.samples_dir / f"{code}.csv"
-                      for code in roles.loc[roles.role.eq("train"), "spygen_code"]]
-    if file_stats(training_paths) != config["raw_input_stats"]:
-        raise ValueError("Training input CSVs changed since fitting.")
-    output = run / "embeddings/epoch_06"
-    output.mkdir(parents=True, exist_ok=True)
-    expected = dict(checkpoint="final.ckpt", checkpoint_sha256=checkpoint_sha,
-                    completed_epochs=6, config_sha256=sha(run / "config.json"),
-                    roles_sha256=sha(role_path), source_stats=stats, batch_size=args.batch_size,
-                    exporter_sha256=sha(__file__), generator_sha256=sha(HERE / "vendor_bt/generate_embeddings_fold.py"))
-    marker = output / "manifest.json"
-    if marker.exists():
-        verified(output, json.loads(marker.read_text()), expected)
-        atomic_json(run / "progress.json", dict(phase="complete", exported_samples=len(roles)))
-        print(f"Verified completed final embeddings: {output}", flush=True)
-        return
-    protocol = output / "export_protocol.json"
-    if protocol.exists():
-        old_protocol = json.loads(protocol.read_text())
-        check_protocol(old_protocol, expected, output)
-        if old_protocol != expected:
-            archive = output / f"export_protocol_before_{old_protocol['exporter_sha256'][:12]}.json"
-            if not archive.exists():
-                atomic_json(archive, old_protocol)
-    atomic_json(protocol, expected)
-    atomic_json(run / "progress.json", dict(phase="initializing_export", total_samples=len(roles)))
-    spec = importlib.util.spec_from_file_location("frozen_export", HERE / "vendor_bt/generate_embeddings_fold.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    module.CHECKPOINT_PATH = checkpoint
-    module.SAMPLE_DIR = args.samples_dir
-    module.RUN_DIR = run
-    module.SEQUENCE_LENGTH = config["sequence_length"]
-    module.INFERENCE_SUBSET_SIZE = config["sample_subset_size"]
-    module.RANDOM_SEED = 0
-    module.EMBEDDING_BATCH_SIZE = args.batch_size
-    # Load once for all samples. Inference/pooling and per-sample random_state=0
-    # remain identical to the original generator.
-    model = module.SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint(checkpoint)
-    cache = output / "_samples"
-    cache.mkdir(exist_ok=True)
-    for position, row in enumerate(roles.itertuples(index=False), 1):
-        directory = cache / row.spygen_code
-        directory.mkdir(exist_ok=True)
-        record = directory / "manifest.json"
-        sample_input = dict(Sample=row.spygen_code, role=row.role,
-                            source_stat=stats[str((args.samples_dir / f"{row.spygen_code}.csv").resolve())])
-        if record.exists():
-            verified(directory, json.loads(record.read_text()), sample_input)
-            print(f"[{position}/{len(roles)}] Verified cached sample: {row.spygen_code}", flush=True)
-        else:
-            print(f"[{position}/{len(roles)}] Exporting {row.spygen_code} ({row.role})", flush=True)
-            with tempfile.TemporaryDirectory(prefix="work_", dir=directory) as temporary:
-                work = Path(temporary)
-                pd.DataFrame([row._asdict()]).to_csv(work / "roles.csv", index=False)
-                module.SAMPLE_ROLES_PATH = work / "roles.csv"
-                module.OUTPUT_DIR = work
-                module.PREPROJECTOR_OUTPUT, module.PROJECTOR_OUTPUT, module.QC_OUTPUT = [work / n for n in NAMES]
-                try:
-                    module.main(model=model)
-                    validate_outputs(work, row.spygen_code, row.role)
-                except Exception as exc:
-                    diagnostic = "unavailable"
-                    try:
-                        diagnostic = preserve_failure(work, directory, row.spygen_code, row.role, exc)
-                    except Exception as preservation_error:
-                        print(f"Could not preserve diagnostics: {preservation_error}", flush=True)
-                    raise RuntimeError(f"Export failed for {row.spygen_code}: {exc}. Diagnostics: {diagnostic}") from exc
-                for name in NAMES:
-                    (work / name).replace(directory / name)
-            if file_stats([args.samples_dir / f"{row.spygen_code}.csv"])[str((args.samples_dir / f"{row.spygen_code}.csv").resolve())] != sample_input["source_stat"]:
-                raise RuntimeError(f"Input changed during export: {row.spygen_code}")
-            atomic_json(record, dict(sample_input, output_sha256={n: sha(directory / n) for n in NAMES}))
-        atomic_json(run / "progress.json", dict(phase="export", completed_samples=position,
-                                                total_samples=len(roles), last_sample=row.spygen_code))
-    if file_stats(paths) != stats:
-        raise RuntimeError("Input CSVs changed during export.")
-    for name in NAMES:
-        frame = pd.concat([pd.read_csv(cache / code / name) for code in roles.spygen_code], ignore_index=True)
-        if not frame.Sample.is_unique or frame.Sample.tolist() != roles.spygen_code.tolist() or frame.role.tolist() != roles.role.tolist():
-            raise ValueError(f"Invalid final sample alignment: {name}")
-        temporary = output / (name + ".tmp")
-        frame.to_csv(temporary, index=False)
-        temporary.replace(output / name)
-    atomic_json(marker, dict(expected, n_samples=len(roles), role_counts=roles.role.value_counts().to_dict(),
-                             output_sha256={n: sha(output / n) for n in NAMES}))
-    atomic_json(run / "progress.json", dict(phase="complete", exported_samples=len(roles)))
-    print(f"EXPORT COMPLETE: {output}", flush=True)
+    from export_staged import run_export
+    return run_export(args, sys.modules[__name__])
 
 
 if __name__ == "__main__":

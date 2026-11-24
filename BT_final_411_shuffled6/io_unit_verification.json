@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "checks": [
+    "Two injected Errno 70 failures recover with identical transferred bytes",
+    "Persistent hash mismatch stops after five attempts and leaves prior destination intact",
+    "JSON publication verifies exact bytes",
+    "Both previous exporter protocols migrate only I/O metadata; changed checkpoints remain rejected",
+    "Injected zero-byte published file is detected by read-back hash and retransferred correctly"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "status": "PASS",
+  "checks": [
+    "Real-model export recovers from injected Errno 70 while staging raw reads",
+    "Entire cache audited: persistent bad hash quarantined, only bad sample regenerated, values identical",
+    "Persistent transport failure stops safely and does not quarantine a valid unreachable cache"
+  ]
+}
