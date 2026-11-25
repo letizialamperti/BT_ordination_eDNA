@@ -1,0 +1,11 @@
+{
+  "status": "PASS",
+  "bash_scripts": 9,
+  "python_syntax": true,
+  "mocked_submissions": 4,
+  "actual_jobs_submitted": 0,
+  "unchanged_training_core": true,
+  "unchanged_generator_pooling_and_IO_transfers": true,
+  "output_root": "runs_bt_final_411_fixed2",
+  "walltime": "24:00:00"
+}

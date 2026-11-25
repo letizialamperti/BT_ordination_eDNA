@@ -1,0 +1,22 @@
+{
+  "cohort_sha256": "1d3bdb59b2505c49783a0764b04e611a12867eab056d09a4fdd9f88816ad9e2b",
+  "counts": {
+    "1": {
+      "train": 316,
+      "outer_eval": 95
+    },
+    "2": {
+      "train": 304,
+      "outer_eval": 107
+    },
+    "3": {
+      "train": 289,
+      "outer_eval": 122
+    },
+    "4": {
+      "train": 324,
+      "outer_eval": 87
+    }
+  },
+  "outer_is_never_used_for_training": true
+}

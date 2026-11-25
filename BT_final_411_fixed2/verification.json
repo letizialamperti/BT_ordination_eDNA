@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "workers": 2,
+  "checks": [
+    "All four outer splits share 411 IDs; outer counts 95/107/122/87",
+    "Fixed views remain identical across epochs; only chunk/batch order changes",
+    "Real BT model trains exactly two fixed-view epochs without opening absent outer CSVs or validating",
+    "Completed training is verified and skipped on pipeline relaunch",
+    "Resume from epoch 1 reproduces final weights exactly and avoids versioned epoch duplicates",
+    "Final export includes train and held-out samples, with 256D/64D outputs and per-sample manifests",
+    "Interrupted export reuses sample transactions; complete exports are hash-verified and skipped",
+    "Incremental export matches original single-pass embeddings for every sample and both layers",
+    "Changed raw training input is rejected on relaunch"
+  ],
+  "source_sha256": {
+    "pilot_checks.py": "8a5a837f5c1cdffff795384e641e9ca88aa7ae31ac6fdb790ff6ded8607d3581",
+    "final_checks.py": "d1780761c0442577d1fddaddac950a16fdad47b5ee5e043aca8b58fd3ceaf33c",
+    "export_io.py": "0632bf87f2036144ac291bfb5012f623887f4a17291a6d43e037e0994bb88924",
+    "verify_export_io.py": "377992f92dfcd0637ad01702cd35cf3a38d8418d63495ce950acf2d412416355",
+    "verify_pipeline.py": "97a33aebdb106ad7db6bc6f797c41889db3ad7e3f2a97bb55d7b77e21a772b8b",
+    "export_staged.py": "e1078d2dc4389f143aa1e8c90188da47312971407032f0d995776f9a5cad9781",
+    "export_final.py": "20f7116a2caddbc195618b1466fe34ed315b38c0a167c39bd1a1838c194e583c",
+    "training_core.py": "97f168564daaa00d299776660ed4d9134fef3da1c3045a3555794d7420769918",
+    "train_final.py": "c34215c4bb0e9c988a6378797351e5a3c52203fbbe2642ec2b57742c38b0ee0c",
+    "vendor_bt/generate_embeddings_fold.py": "1ff6fa5584998b6e805e39687cbdfa2a21eaf5006f82c54c52931eafed92acae"
+  }
+}
