@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "checks": [
+    "Local staging, retries, pooling and generator copied unchanged from verified final export",
+    "Six shell scripts have valid Bash syntax",
+    "All four initial state_dicts including buffers checked before one shared 439-sample export",
+    "Four trained-test jobs select their own final checkpoint and exactly the same 28 test IDs",
+    "Changed initialization is rejected before embedding inference",
+    "All five OAR jobs invoke export only, correct checkpoints, output roots and 24-hour GPU allocations"
+  ],
+  "scope": "Checkpoint identity and job-routing integration; unchanged numerical exporter verified in original bundle"
+}
